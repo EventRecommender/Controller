@@ -1,0 +1,6 @@
+services:
+  test:
+    build: .
+    container_name: "test"
+    ports:
+      - 80:80
