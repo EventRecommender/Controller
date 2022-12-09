@@ -2,7 +2,7 @@
 $token = Get-content ./token.txt
 
 # cloning frontend
-git clone https://$token@github.com/EventRecommender/EventsRecommenderFrontend.git ./Controller/ClientApp
+git clone -b dev https://$token@github.com/EventRecommender/EventsRecommenderFrontend.git ./Controller/ClientApp
 
 # clone services
 git clone -b dev https://$token@github.com/EventRecommender/ActivityService ./activity
@@ -16,7 +16,7 @@ docker-compose -f ./recommender/docker-compose.yml up -d --build
 
 # building
 docker build . --tag controller
-docker run --name controller-service -p 80:80 controller
+docker run -d --name controller-service -p 80:80 controller
 
 # stop
 Write-host "script ended"

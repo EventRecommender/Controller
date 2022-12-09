@@ -5,9 +5,9 @@ using Controller.model;
 var builder = WebApplication.CreateBuilder(args);
 
 // TODO add port
-string activityUrl = "http://activity";
-string recommenderUrl = "http://recommender";
-string userManagerUrl = "http://usermanager";
+string activityUrl = "http://activity-service";
+string recommenderUrl = "http://recommender-service";
+string userManagerUrl = "http://usermanager-service";
 
 HttpClient client = new HttpClient();
 
@@ -62,9 +62,10 @@ app.MapPost("/createActivity", async (activityCreation act) =>
             return Results.Ok();
         else return Results.BadRequest();
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong, try again later");
+        throw ex;
+        //return Results.Problem("something went wrong, try again later");
     }
 });
 
@@ -80,9 +81,10 @@ app.MapGet("/getCreatedActivities", async (int userid) =>
         }
         else return Results.BadRequest();
 }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong, try again later");
+        throw ex;
+        //return Results.Problem(ex.Message);
     }
 });
 
@@ -99,9 +101,10 @@ app.MapPost("/createUser", async (accountCreation acc) =>
             return Results.Ok();
         return Results.Conflict();
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong");
+        throw ex;
+        //return Results.Problem("something went wrong");
     }
 });
 
@@ -123,10 +126,7 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
             return Results.Ok();
         return Results.BadRequest();
     }
-    catch
-    {
-        return Results.Problem("something went wrong");
-    }
+    catch (Exception ex) { throw ex; }
 
 });
 
@@ -146,9 +146,9 @@ app.MapPost("/login", async (Login login) =>
         }
         else return Results.BadRequest();
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong, try again later");
+        throw ex;
     }
 });
 
@@ -183,9 +183,9 @@ app.MapGet("/getRecommendations", async (int userid) =>
         content = await response.Content.ReadAsStringAsync();
         return Results.Ok(content);
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong");
+        throw ex;
     }
 });
 
@@ -204,9 +204,9 @@ app.MapGet("/getIncommingActivities", async (string monthsForward, string area) 
         else
             return Results.BadRequest();
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong, try again later");
+        throw ex;
     }
 });
 
@@ -225,9 +225,9 @@ app.MapGet("/getUserActivties", async (int userid) =>
         }
         else return Results.BadRequest();
     }
-    catch
+    catch(Exception ex)
     {
-        return Results.Problem("something went wrong");
+        throw ex;
     }
 });
 
@@ -246,9 +246,9 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
         }
         else return Results.BadRequest();
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("soemthing went wrong");
+        throw ex;
     }
 });
 

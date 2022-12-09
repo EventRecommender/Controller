@@ -1,7 +1,7 @@
 $token = Get-content ./token.txt
 
 # cloning frontend
-git clone https://$token@github.com/EventRecommender/EventsRecommenderFrontend.git ./Controller/ClientApp
+git clone -b dev https://$token@github.com/EventRecommender/EventsRecommenderFrontend.git ./Controller/ClientApp
 
 docker build . --tag controllerdebug
 
