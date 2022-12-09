@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Controller.model;
 
@@ -50,13 +51,13 @@ app.MapPost("/createActivity", async (activityCreation act) =>
 {
     try
     {
-        UriBuilder builder = new UriBuilder(activityUrl);
-        builder.Query = $"title='{act.title}'" +
+        UriBuilder uriBuilder = new UriBuilder(activityUrl);
+        uriBuilder.Query = $"title='{act.title}'" +
                         $"&host='{act.host}'" +
                         $"&location='{act.city}'" +
                         $"&date='{act.date}'&imageurl='{act.image}'" +
                         $"&url=''&description={act.description}";
-        HttpResponseMessage answer = await client.GetAsync(builder.Uri.AbsoluteUri);
+        HttpResponseMessage answer = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (answer.IsSuccessStatusCode)
             return Results.Ok();
         else return Results.BadRequest();
@@ -89,14 +90,11 @@ app.MapPost("/createUser", async (accountCreation acc) =>
 {
     try
     {
-        UriBuilder builder = new UriBuilder(userManagerUrl);
-        builder.Path = "/Create";
-        builder.Query = $"username='{acc.Username}'" +
-                        $"&password='{acc.Password}'" +
-                        $"&city='{acc.City}'" +
-                        $"&role='{acc.Role}'";
-        StringContent content = new StringContent("");
-        HttpResponseMessage response = await client.PutAsync(requestUri: builder.Uri.AbsoluteUri, content: content);
+        UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
+        uriBuilder.Path = "/Create";
+
+        StringContent content = new StringContent(JsonSerializer.Serialize(acc), Encoding.UTF8, "application/json");
+        HttpResponseMessage response = await client.PutAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
         if (response.IsSuccessStatusCode)
             return Results.Ok();
         return Results.Conflict();
@@ -113,14 +111,14 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
     {
         int update_type = isLike ? 0 : 1;
 
-        UriBuilder builder = new UriBuilder(recommenderUrl);
-        builder.Path = "/UpdateUserInterests";
-        builder.Query = $"user_ID='{userid}'" +
+        UriBuilder uriBuilder = new UriBuilder(recommenderUrl);
+        uriBuilder.Path = "/UpdateUserInterests";
+        uriBuilder.Query = $"user_ID='{userid}'" +
                         $"&activity_types='{activity_types}'" +
                         $"&update_type='{update_type}'";
 
         StringContent content = new StringContent("");
-        HttpResponseMessage responseMessage = await client.PostAsync(builder.Uri.AbsoluteUri, content);
+        HttpResponseMessage responseMessage = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
         if (responseMessage.IsSuccessStatusCode)
             return Results.Ok();
         return Results.BadRequest();
@@ -136,11 +134,10 @@ app.MapPost("/login", async (Login login) =>
 {
     try
     {
-        UriBuilder builder = new UriBuilder(userManagerUrl);
-        builder.Query = $"username='{login.Username}'&password='{login.Password}'";
-        builder.Path = "/login";
-        StringContent content = new StringContent("");
-        HttpResponseMessage answer = await client.PostAsync(requestUri: builder.Uri.AbsoluteUri, content: content);
+        UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
+        uriBuilder.Path = "/login";
+        StringContent content = new StringContent(JsonSerializer.Serialize(login), Encoding.UTF8, "application/json");
+        HttpResponseMessage answer = await client.PostAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
         
         if (answer.IsSuccessStatusCode)
         {
@@ -164,10 +161,10 @@ app.MapGet("/getRecommendations", async (int userid) =>
     try
     {
         //Get recommendation
-        UriBuilder builder = new UriBuilder(recommenderUrl);
-        builder.Query = $"User_ID={userid}";
-        builder.Path = "/GetRecommendation";
-        var response = await client.GetAsync(builder.Uri.AbsoluteUri);
+        UriBuilder uriBuilder = new UriBuilder(recommenderUrl);
+        uriBuilder.Query = $"User_ID={userid}";
+        uriBuilder.Path = "/GetRecommendation";
+        var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
             return Results.Problem("something went wrong");
 
@@ -176,10 +173,10 @@ app.MapGet("/getRecommendations", async (int userid) =>
             return Results.Ok(content);
 
         //Calculate recommendation
-        builder = new UriBuilder(recommenderUrl);
-        builder.Query = $"User_ID={userid}";
-        builder.Path = "/CalculateRecomendation";
-        response = await client.GetAsync(builder.Uri.AbsoluteUri);
+        uriBuilder = new UriBuilder(recommenderUrl);
+        uriBuilder.Query = $"User_ID={userid}";
+        uriBuilder.Path = "/CalculateRecomendation";
+        response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
             return Results.Problem("something went wrong");
 
@@ -196,10 +193,10 @@ app.MapGet("/getIncommingActivities", async (string monthsForward, string area) 
 {
     try
     {
-        UriBuilder builder = new UriBuilder(activityUrl);
-        builder.Query = $"function='areaTime'&area='{area}'&jsonActivityList=''";
+        UriBuilder uriBuilder = new UriBuilder(activityUrl);
+        uriBuilder.Query = $"function='areaTime'&area='{area}'&jsonActivityList=''";
 
-        HttpResponseMessage answer = await client.GetAsync(requestUri: builder.Uri.AbsoluteUri);
+        HttpResponseMessage answer = await client.GetAsync(requestUri: uriBuilder.Uri.AbsoluteUri);
         if (answer.IsSuccessStatusCode)
         {
             return Results.Ok(await answer.Content.ReadAsStringAsync());
@@ -217,11 +214,11 @@ app.MapGet("/getUserActivties", async (int userid) =>
 {
     try
     {
-        UriBuilder builder = new UriBuilder(activityUrl);
-        builder.Path = "/GetActivities";
-        builder.Query = $"userID={userid}";
+        UriBuilder uriBuilder = new UriBuilder(activityUrl);
+        uriBuilder.Path = "/GetActivities";
+        uriBuilder.Query = $"userID={userid}";
 
-        var response = await client.GetAsync(builder.Uri.AbsoluteUri);
+        var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
         {
             return Results.Ok(await response.Content.ReadAsStringAsync());
@@ -238,11 +235,11 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
 {
     try
     {
-        UriBuilder builder = new UriBuilder(activityUrl);
-        builder.Path = "/RemoveActivities";
-        builder.Query = $"jsonActivityList='{activityList}'";
+        UriBuilder uriBuilder = new UriBuilder(activityUrl);
+        uriBuilder.Path = "/RemoveActivities";
+        uriBuilder.Query = $"jsonActivityList='{activityList}'";
 
-        var response = await client.DeleteAsync(builder.Uri.AbsoluteUri);
+        var response = await client.DeleteAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
         {
             return Results.Ok();
