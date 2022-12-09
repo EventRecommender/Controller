@@ -19,9 +19,6 @@ COPY ["Controller/Controller.csproj", "Controller/"]
 RUN dotnet restore "Controller/Controller.csproj"
 COPY . .
 
-# cloning frontend
-RUN git clone https://<INSERT TOKEN>@github.com/EventRecommender/EventsRecommenderFrontend.git "/src/Controller/ClientApp"
-
 WORKDIR "/src/Controller"
 RUN dotnet build "Controller.csproj" -c Release -o /app/build
 
