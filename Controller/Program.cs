@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Controller.model;
@@ -24,11 +25,10 @@ if (!app.Environment.IsDevelopment())
 
 
 //TODO 
-// - endpoints
+// - endpoints 
 // - auth
-// - smoke test
+// - smoke test 
 // - global smoke test
-
 
 /*
 ActivityList.js
@@ -47,64 +47,65 @@ app.UseRouting();
 app.MapFallbackToFile("index.html");
 
 
+string removeSlashes(string input)
+{
+    return input.Replace("\\", "");
+}
+
+
 app.MapPost("/createActivity", async (activityCreation act) =>
 {
     try
     {
         UriBuilder uriBuilder = new UriBuilder(activityUrl);
-        uriBuilder.Query = $"title='{act.title}'" +
-                        $"&host='{act.host}'" +
-                        $"&location='{act.city}'" +
-                        $"&date='{act.date}'&imageurl='{act.image}'" +
-                        $"&url=''&description={act.description}";
-        HttpResponseMessage answer = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
+        uriBuilder.Query = $"title={act.title}" +
+                           $"&host={act.host}" +
+                           $"&location={act.city}" +
+                           $"&date={act.date}&imageurl={act.image}" +
+                           $"&url=&description={act.description}";
+
+        uriBuilder.Path = "/AddActivity";
+        StringContent content = new StringContent("");
+        HttpResponseMessage answer = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
         if (answer.IsSuccessStatusCode)
             return Results.Ok();
-        else return Results.BadRequest();
+        return Results.BadRequest();
     }
-    catch (Exception ex)
+    catch
     {
-        throw ex;
-        //return Results.Problem("something went wrong, try again later");
-    }
-});
-
-app.MapGet("/getCreatedActivities", async (int userid) =>
-{
-    try
-    {
-        HttpResponseMessage answer = await client.GetAsync(activityUrl + "/GetUserActivities");
-        if (answer.IsSuccessStatusCode)
-        {
-            string content = await answer.Content.ReadAsStringAsync();
-            return Results.Ok(content);
-        }
-        else return Results.BadRequest();
-}
-    catch (Exception ex)
-    {
-        throw ex;
-        //return Results.Problem(ex.Message);
+        return Results.Problem("something went wrong, try again later");
     }
 });
 
-app.MapPost("/createUser", async (accountCreation acc) =>
+app.MapPost("/createUser", async (Tuple<accountCreation,List<string>> acc) =>
 {
     try
     {
         UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
         uriBuilder.Path = "/Create";
 
-        StringContent content = new StringContent(JsonSerializer.Serialize(acc), Encoding.UTF8, "application/json");
+        //Create user
+        StringContent content = new StringContent(JsonSerializer.Serialize(acc.Item1), Encoding.UTF8, "application/json");
         HttpResponseMessage response = await client.PutAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
-        if (response.IsSuccessStatusCode)
-            return Results.Ok();
-        return Results.Conflict();
+        if (!response.IsSuccessStatusCode)    
+            return Results.Conflict();
+
+        int id = int.Parse(await response.Content.ReadAsStringAsync());
+
+        //Create interest
+        string initial_types = JsonSerializer.Serialize(acc.Item2);
+        uriBuilder = new UriBuilder(recommenderUrl);
+        uriBuilder.Path = "/CreateUserInterests";
+        uriBuilder.Query = $"userid={id}&initial_types={initial_types}";
+
+        response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
+        if (!response.IsSuccessStatusCode)
+            return Results.Problem("something went wrong");
+        return Results.Ok(id);
     }
-    catch (Exception ex)
+    catch
     {
-        throw ex;
-        //return Results.Problem("something went wrong");
+        return Results.Problem("something went wrong");
     }
 });
 
@@ -116,9 +117,9 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
 
         UriBuilder uriBuilder = new UriBuilder(recommenderUrl);
         uriBuilder.Path = "/UpdateUserInterests";
-        uriBuilder.Query = $"user_ID='{userid}'" +
-                        $"&activity_types='{activity_types}'" +
-                        $"&update_type='{update_type}'";
+        uriBuilder.Query = $"userid={userid}" +
+                           $"&activity_types={activity_types}" +
+                           $"&update_type={update_type}";
 
         StringContent content = new StringContent("");
         HttpResponseMessage responseMessage = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
@@ -126,7 +127,10 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
             return Results.Ok();
         return Results.BadRequest();
     }
-    catch (Exception ex) { throw ex; }
+    catch
+    {
+        return Results.Problem("something went wrong");
+    }
 
 });
 
@@ -142,18 +146,36 @@ app.MapPost("/login", async (Login login) =>
         if (answer.IsSuccessStatusCode)
         {
             string answerContent = await answer.Content.ReadAsStringAsync();
-            return Results.Ok(answerContent);
+            return Results.Ok(removeSlashes(answerContent)); // TODO FIX TIHS TO JSON
         }
         else return Results.BadRequest();
     }
-    catch (Exception ex)
+    catch
     {
-        throw ex;
+        return Results.Problem("something went wrong");
     }
 });
 
-app.MapGet("/getUsers", () => { // <- this boy weird
-    return Results.Problem("not implemented");
+app.MapGet("/getUsers", async (string token) => 
+{
+    try
+    {
+        UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
+        uriBuilder.Path = "/FetchAllUsers";
+
+        //Making client with token
+        HttpClient clientWithToken = new HttpClient();
+        clientWithToken.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        HttpResponseMessage response = await clientWithToken.GetAsync(uriBuilder.Uri.AbsoluteUri);
+        if (response.IsSuccessStatusCode)
+            return Results.Ok(removeSlashes(await response.Content.ReadAsStringAsync()));
+        return Results.BadRequest();
+    }
+    catch
+    {
+        return Results.Problem("something went wrong");
+    }
 });
 
 app.MapGet("/getRecommendations", async (int userid) =>
@@ -170,7 +192,7 @@ app.MapGet("/getRecommendations", async (int userid) =>
 
         string content = await response.Content.ReadAsStringAsync();
         if (content != "") // TODO OR STATUS CODE
-            return Results.Ok(content);
+            return Results.Ok(removeSlashes(content));
 
         //Calculate recommendation
         uriBuilder = new UriBuilder(recommenderUrl);
@@ -181,32 +203,33 @@ app.MapGet("/getRecommendations", async (int userid) =>
             return Results.Problem("something went wrong");
 
         content = await response.Content.ReadAsStringAsync();
-        return Results.Ok(content);
+        return Results.Ok(removeSlashes(content));
     }
-    catch (Exception ex)
+    catch
     {
-        throw ex;
+        return Results.Problem("something went wrong");
     }
 });
 
-app.MapGet("/getIncommingActivities", async (string monthsForward, string area) =>
+app.MapGet("/getIncommingActivities", async (int monthsForward, string area) =>
 {
     try
     {
         UriBuilder uriBuilder = new UriBuilder(activityUrl);
-        uriBuilder.Query = $"function='areaTime'&area='{area}'&jsonActivityList=''";
+        uriBuilder.Query = $"function=areaTime&area={area}&monthsForward={monthsForward}&jsonActivityList=";
+        uriBuilder.Path = "/GetActivities";
 
         HttpResponseMessage answer = await client.GetAsync(requestUri: uriBuilder.Uri.AbsoluteUri);
         if (answer.IsSuccessStatusCode)
         {
-            return Results.Ok(await answer.Content.ReadAsStringAsync());
+            return Results.Ok(removeSlashes (await answer.Content.ReadAsStringAsync()));
         }
         else
             return Results.BadRequest();
     }
-    catch (Exception ex)
+    catch 
     {
-        throw ex;
+        return Results.Problem("something went wrong"); 
     }
 });
 
@@ -215,19 +238,19 @@ app.MapGet("/getUserActivties", async (int userid) =>
     try
     {
         UriBuilder uriBuilder = new UriBuilder(activityUrl);
-        uriBuilder.Path = "/GetActivities";
+        uriBuilder.Path = "/GetUserActivities";
         uriBuilder.Query = $"userID={userid}";
 
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
         {
-            return Results.Ok(await response.Content.ReadAsStringAsync());
+            return Results.Ok(removeSlashes(await response.Content.ReadAsStringAsync()));
         }
         else return Results.BadRequest();
     }
-    catch(Exception ex)
+    catch
     {
-        throw ex;
+        return Results.Problem("something went wrong");
     }
 });
 
@@ -237,7 +260,7 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
     {
         UriBuilder uriBuilder = new UriBuilder(activityUrl);
         uriBuilder.Path = "/RemoveActivities";
-        uriBuilder.Query = $"jsonActivityList='{activityList}'";
+        uriBuilder.Query = $"jsonActivityList={activityList}";
 
         var response = await client.DeleteAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
@@ -246,9 +269,9 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
         }
         else return Results.BadRequest();
     }
-    catch (Exception ex)
+    catch
     {
-        throw ex;
+        return Results.Problem("something went wrong");
     }
 });
 
