@@ -24,23 +24,6 @@ if (!app.Environment.IsDevelopment())
 }
 
 
-//TODO 
-// - endpoints 
-// - auth
-// - smoke test 
-// - global smoke test
-
-/*
-ActivityList.js
-CreateActivity.js
-CreatedActivities.js
-CreateUser.js
-Loginpage.js
-UserList.js
-RecommendedActivities.js
-Calendar?
-*/
-
 app.UseStaticFiles();
 app.UseRouting();
 
@@ -132,7 +115,6 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
     {
         return Results.Problem("something went wrong");
     }
-
 });
 
 app.MapPost("/login", async (Login login) =>
@@ -146,8 +128,8 @@ app.MapPost("/login", async (Login login) =>
         
         if (answer.IsSuccessStatusCode)
         {
-            string answerContent = await answer.Content.ReadAsStringAsync();
-            return Results.Ok(removeSlashes(answerContent)); // TODO FIX TIHS TO JSON
+            var answerObj = await answer.Content.ReadFromJsonAsync<dynamic>();
+            return Results.Json(answerObj);
         }
         else return Results.BadRequest();
     }
@@ -170,7 +152,10 @@ app.MapGet("/getUsers", async (string token) =>
 
         HttpResponseMessage response = await clientWithToken.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
-            return Results.Ok(removeSlashes(await response.Content.ReadAsStringAsync()));
+        {
+            var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
+            return Results.Json(answerObj);
+        }
         return Results.BadRequest();
     }
     catch
@@ -187,28 +172,36 @@ app.MapGet("/getRecommendations", async (int userid) =>
         uriBuilder.Query = $"userid={userid}";
         uriBuilder.Path = "/GetRecommendation";
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
-        string content;
-        if (response.IsSuccessStatusCode)
-        {
-            content = await response.Content.ReadAsStringAsync();
-            return Results.Ok(removeSlashes(content));
-        }
         
-
-        uriBuilder.Path = "/CalculateRecommendation";
-        response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
         if (!response.IsSuccessStatusCode)
-            return Results.Problem("something went wrong");
+        {
+            uriBuilder.Path = "/CalculateRecommendation";
+            response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
+            if (!response.IsSuccessStatusCode)
+                return Results.Problem("something went wrong");
 
+            uriBuilder.Path = "/GetRecommendation";
+            response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Results.BadRequest();
+            }
+        }
 
-        uriBuilder.Path = "/GetRecommendation";
+        //Getting activities
+        uriBuilder = new UriBuilder(activityUrl);
+        uriBuilder.Path = "/GetActivitiesByPreference";
+
+        var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
+        uriBuilder.Query = $"&jsonPreferenceList={JsonSerializer.Serialize(answerObj)}";
+
         response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
         {
-            return Results.BadRequest();
+            return Results.Problem(response.Content.ToString());
         }
-        content = await response.Content.ReadAsStringAsync();
-        return Results.Ok(removeSlashes(content));
+        answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
+        return Results.Json(answerObj);
     }
     catch
     {
@@ -227,7 +220,8 @@ app.MapGet("/getIncommingActivities", async (int monthsForward, string area) =>
         HttpResponseMessage answer = await client.GetAsync(requestUri: uriBuilder.Uri.AbsoluteUri);
         if (answer.IsSuccessStatusCode)
         {
-            return Results.Ok(removeSlashes (await answer.Content.ReadAsStringAsync()));
+            var answerObj = await answer.Content.ReadFromJsonAsync<dynamic>();
+            return Results.Json(answerObj);
         }
         else
             return Results.BadRequest();
@@ -249,7 +243,8 @@ app.MapGet("/getUserActivties", async (int userid) =>
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
         {
-            return Results.Ok(removeSlashes(await response.Content.ReadAsStringAsync()));
+            var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
+            return Results.Json(answerObj);
         }
         else return Results.BadRequest();
     }
