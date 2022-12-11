@@ -62,3 +62,10 @@ services:
     volumes:
       - ./usermanager/UserManager/mysql_db_data:/var/lib/mysql
       - ./usermanager/UserManager/entry:/docker-entrypoint-initdb.d/ 
+  
+  # Scraper
+  scraper:
+    build: ./scraper/Scraper
+    container_name: scraper-service
+    ports: 
+      - 7000:5000

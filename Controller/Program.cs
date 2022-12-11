@@ -62,7 +62,8 @@ app.MapPost("/createActivity", async (activityCreation act) =>
                            $"&host={act.host}" +
                            $"&location={act.city}" +
                            $"&date={act.date}&imageurl={act.image}" +
-                           $"&url=&description={act.description}";
+                           $"&url=&description={act.description}" +
+                           $"&type={act.type}";
 
         uriBuilder.Path = "/AddActivity";
         StringContent content = new StringContent("");
@@ -182,26 +183,30 @@ app.MapGet("/getRecommendations", async (int userid) =>
 {
     try
     {
-        //Get recommendation
         UriBuilder uriBuilder = new UriBuilder(recommenderUrl);
-        uriBuilder.Query = $"User_ID={userid}";
+        uriBuilder.Query = $"userid={userid}";
         uriBuilder.Path = "/GetRecommendation";
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
+        string content;
+        if (response.IsSuccessStatusCode)
+        {
+            content = await response.Content.ReadAsStringAsync();
+            return Results.Ok(removeSlashes(content));
+        }
+        
+
+        uriBuilder.Path = "/CalculateRecommendation";
+        response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
         if (!response.IsSuccessStatusCode)
             return Results.Problem("something went wrong");
 
-        string content = await response.Content.ReadAsStringAsync();
-        if (content != "") // TODO OR STATUS CODE
-            return Results.Ok(removeSlashes(content));
 
-        //Calculate recommendation
-        uriBuilder = new UriBuilder(recommenderUrl);
-        uriBuilder.Query = $"User_ID={userid}";
-        uriBuilder.Path = "/CalculateRecomendation";
+        uriBuilder.Path = "/GetRecommendation";
         response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
-            return Results.Problem("something went wrong");
-
+        {
+            return Results.BadRequest();
+        }
         content = await response.Content.ReadAsStringAsync();
         return Results.Ok(removeSlashes(content));
     }
