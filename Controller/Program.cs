@@ -29,13 +29,6 @@ app.UseRouting();
 
 app.MapFallbackToFile("index.html");
 
-
-string removeSlashes(string input)
-{
-    return input.Replace("\\", "");
-}
-
-
 app.MapPost("/createActivity", async (activityCreation act) =>
 {
     try
