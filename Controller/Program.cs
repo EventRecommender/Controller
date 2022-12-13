@@ -178,7 +178,7 @@ app.MapGet("/getRecommendations", async (int userid) =>
             uriBuilder.Path = "/CalculateRecommendation";
             response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
             if (!response.IsSuccessStatusCode)
-                return Results.Problem("something went wrong");
+                return Results.BadRequest();
 
             uriBuilder.Path = "/GetRecommendation";
             response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
@@ -198,14 +198,14 @@ app.MapGet("/getRecommendations", async (int userid) =>
         response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
         {
-            return Results.Problem(response.Content.ToString());
+            return Results.Problem(await response.Content.ReadAsStringAsync());
         }
         answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
         return Results.Json(answerObj);
     }
-    catch
+    catch (Exception ex)
     {
-        return Results.Problem("something went wrong");
+        return Results.Problem(ex.Message);
     }
 });
 
@@ -232,13 +232,13 @@ app.MapGet("/getIncommingActivities", async (int monthsForward, string area) =>
     }
 });
 
-app.MapGet("/getUserActivties", async (int userid) =>
+app.MapGet("/getUserActivties", async (string username) =>
 {
     try
     {
         UriBuilder uriBuilder = new UriBuilder(activityUrl);
         uriBuilder.Path = "/GetUserActivities";
-        uriBuilder.Query = $"userID={userid}";
+        uriBuilder.Query = $"username={username}";
 
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (response.IsSuccessStatusCode)
@@ -272,6 +272,29 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
     catch
     {
         return Results.Problem("something went wrong");
+    }
+});
+
+app.MapDelete("/removeUser", async (string token, int userid) => {
+    try{
+        UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
+        uriBuilder.Path = "/delete";
+        uriBuilder.Query = $"&userId={userid}";
+
+        //Making client with token
+        HttpClient clientWithToken = new HttpClient();
+        clientWithToken.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        HttpResponseMessage response = await clientWithToken.GetAsync(uriBuilder.Uri.AbsoluteUri);
+        if (response.IsSuccessStatusCode)
+        {
+            var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
+            return Results.Json(answerObj);
+        }
+        return Results.BadRequest();
+    }
+    catch{
+        return Results.Problem("Something went wrong");
     }
 });
 
