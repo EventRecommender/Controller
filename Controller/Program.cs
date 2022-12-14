@@ -29,6 +29,12 @@ app.UseRouting();
 
 app.MapFallbackToFile("index.html");
 
+async Task<IResult> HandleProblemFromService(HttpResponseMessage response)
+{
+    Console.WriteLine(await response.Content.ReadAsStringAsync());
+    return Results.Problem("something went wrong");
+}
+
 app.MapPost("/createActivity", async (activityCreation act) =>
 {
     try
@@ -43,14 +49,18 @@ app.MapPost("/createActivity", async (activityCreation act) =>
 
         uriBuilder.Path = "/AddActivity";
         StringContent content = new StringContent("");
-        HttpResponseMessage answer = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
-        if (answer.IsSuccessStatusCode)
+        HttpResponseMessage response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
+        if (response.IsSuccessStatusCode)
             return Results.Ok();
+        if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
+        }
         return Results.BadRequest();
     }
     catch
     {
-        return Results.Problem("something went wrong, try again later");
+        return Results.Problem("something went wrong");
     }
 });
 
@@ -64,8 +74,22 @@ app.MapPost("/createUser", async (Tuple<accountCreation,List<string>> acc) =>
         //Create user
         StringContent content = new StringContent(JsonSerializer.Serialize(acc.Item1), Encoding.UTF8, "application/json");
         HttpResponseMessage response = await client.PutAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
-        if (!response.IsSuccessStatusCode)    
-            return Results.Conflict();
+        if (!response.IsSuccessStatusCode)
+        {
+            if ((int)response.StatusCode == 409)
+            {
+                return Results.Conflict();
+            }
+            else if ((int)response.StatusCode >= 500)
+            {
+                return await HandleProblemFromService(response);
+            }
+            else
+            {
+                return Results.BadRequest();
+            }
+        }
+        
 
         int id = int.Parse(await response.Content.ReadAsStringAsync());
 
@@ -77,7 +101,17 @@ app.MapPost("/createUser", async (Tuple<accountCreation,List<string>> acc) =>
 
         response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
         if (!response.IsSuccessStatusCode)
-            return Results.Problem("something went wrong");
+        {
+            if((int)response.StatusCode >= 500)
+            {
+                return await HandleProblemFromService(response);
+            }
+            else
+            {
+                return Results.BadRequest();
+            }
+
+        }
         return Results.Ok(id);
     }
     catch
@@ -101,8 +135,17 @@ app.MapPost("/like", async (bool isLike, string activity_types, int userid) =>
         StringContent content = new StringContent("");
         HttpResponseMessage responseMessage = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, content);
         if (responseMessage.IsSuccessStatusCode)
+        {
             return Results.Ok();
-        return Results.BadRequest();
+        }
+        else if ((int)responseMessage.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(responseMessage);
+        }
+        else
+        {
+            return Results.BadRequest();
+        }
     }
     catch
     {
@@ -117,14 +160,21 @@ app.MapPost("/login", async (Login login) =>
         UriBuilder uriBuilder = new UriBuilder(userManagerUrl);
         uriBuilder.Path = "/login";
         StringContent content = new StringContent(JsonSerializer.Serialize(login), Encoding.UTF8, "application/json");
-        HttpResponseMessage answer = await client.PostAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
+        HttpResponseMessage response = await client.PostAsync(requestUri: uriBuilder.Uri.AbsoluteUri, content: content);
         
-        if (answer.IsSuccessStatusCode)
+        if (response.IsSuccessStatusCode)
         {
-            var answerObj = await answer.Content.ReadFromJsonAsync<dynamic>();
+            var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
             return Results.Json(answerObj);
         }
-        else return Results.BadRequest();
+        if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
+        }
+        else
+        {
+            return Results.BadRequest();
+        }
     }
     catch
     {
@@ -149,7 +199,14 @@ app.MapGet("/getUsers", async (string token) =>
             var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
             return Results.Json(answerObj);
         }
-        return Results.BadRequest();
+        else if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
+        }
+        else
+        {
+            return Results.BadRequest();
+        }
     }
     catch
     {
@@ -166,12 +223,21 @@ app.MapGet("/getRecommendations", async (int userid) =>
         uriBuilder.Path = "/GetRecommendation";
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode && (int)response.StatusCode == 400)
         {
             uriBuilder.Path = "/CalculateRecommendation";
             response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
             if (!response.IsSuccessStatusCode)
-                return Results.BadRequest();
+            {
+                if ((int)response.StatusCode >= 500)
+                {
+                    return await HandleProblemFromService(response);
+                }
+                else
+                {
+                    return Results.BadRequest();
+                }
+            }
 
             uriBuilder.Path = "/GetRecommendation";
             response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
@@ -179,6 +245,14 @@ app.MapGet("/getRecommendations", async (int userid) =>
             {
                 return Results.BadRequest();
             }
+        }
+        else if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
+        }
+        else
+        {
+            return Results.BadRequest();
         }
 
         //Getting activities
@@ -191,7 +265,7 @@ app.MapGet("/getRecommendations", async (int userid) =>
         response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         if (!response.IsSuccessStatusCode)
         {
-            return Results.Problem(await response.Content.ReadAsStringAsync());
+            return await HandleProblemFromService(response);
         }
         answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
         return Results.Json(answerObj);
@@ -210,11 +284,15 @@ app.MapGet("/getIncommingActivities", async (int monthsForward, string area) =>
         uriBuilder.Query = $"function=areaTime&area={area}&monthsForward={monthsForward}&jsonActivityList=";
         uriBuilder.Path = "/GetActivities";
 
-        HttpResponseMessage answer = await client.GetAsync(requestUri: uriBuilder.Uri.AbsoluteUri);
-        if (answer.IsSuccessStatusCode)
+        HttpResponseMessage respons = await client.GetAsync(requestUri: uriBuilder.Uri.AbsoluteUri);
+        if (respons.IsSuccessStatusCode)
         {
-            var answerObj = await answer.Content.ReadFromJsonAsync<dynamic>();
+            var answerObj = await respons.Content.ReadFromJsonAsync<dynamic>();
             return Results.Json(answerObj);
+        }
+        else if ((int) respons.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(respons);
         }
         else
             return Results.BadRequest();
@@ -239,6 +317,10 @@ app.MapGet("/getUserActivties", async (string username) =>
             var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
             return Results.Json(answerObj);
         }
+        else if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
+        }
         else return Results.BadRequest();
     }
     catch
@@ -259,6 +341,10 @@ app.MapDelete("/RemoveActivity", async (string activityList) =>
         if (response.IsSuccessStatusCode)
         {
             return Results.Ok();
+        }
+        else if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
         }
         else return Results.BadRequest();
     }
@@ -283,6 +369,10 @@ app.MapDelete("/removeUser", async (string token, int userid) => {
         {
             var answerObj = await response.Content.ReadFromJsonAsync<dynamic>();
             return Results.Json(answerObj);
+        }
+        if ((int)response.StatusCode >= 500)
+        {
+            return await HandleProblemFromService(response);
         }
         return Results.BadRequest();
     }
