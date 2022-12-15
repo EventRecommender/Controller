@@ -223,7 +223,7 @@ app.MapGet("/getRecommendations", async (int userid) =>
         uriBuilder.Path = "/GetRecommendation";
         var response = await client.GetAsync(uriBuilder.Uri.AbsoluteUri);
         
-        if (!response.IsSuccessStatusCode && (int)response.StatusCode == 400)
+        if ((int)response.StatusCode == 400)
         {
             uriBuilder.Path = "/CalculateRecommendation";
             response = await client.PostAsync(uriBuilder.Uri.AbsoluteUri, new StringContent(""));
@@ -249,10 +249,6 @@ app.MapGet("/getRecommendations", async (int userid) =>
         else if ((int)response.StatusCode >= 500)
         {
             return await HandleProblemFromService(response);
-        }
-        else
-        {
-            return Results.BadRequest();
         }
 
         //Getting activities
