@@ -1,6 +1,0 @@
-services:
-  controller:
-    build: .
-    container_name: controller-service
-    ports:
-      - 80:80
